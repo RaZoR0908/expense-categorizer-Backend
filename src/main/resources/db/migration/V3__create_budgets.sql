@@ -1,0 +1,7 @@
+CREATE TABLE budgets (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id),
+    category VARCHAR(100) NOT NULL,
+    monthly_limit DECIMAL(12,2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

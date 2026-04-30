@@ -1,0 +1,8 @@
+target/
+*.class
+.classpath
+.project
+.settings/
+*.log
+application.yaml
+application.yml
