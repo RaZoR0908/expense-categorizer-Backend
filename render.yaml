@@ -1,0 +1,5 @@
+services:
+  - type: web
+    name: expense-categorizer
+    buildCommand: mvn clean install
+    startCommand: java -jar target/expense-categorizer-0.0.1-SNAPSHOT.jar
