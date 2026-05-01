@@ -6,11 +6,13 @@ import com.expense.expense_categorizer.model.User;
 import com.expense.expense_categorizer.repository.BudgetRepository;
 import com.expense.expense_categorizer.repository.UserRepository;
 import com.expense.expense_categorizer.security.JwtUtil;
+import com.expense.expense_categorizer.service.BudgetService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.math.BigDecimal;
+
+import java.time.YearMonth;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -28,6 +30,9 @@ public class BudgetController {
     @Autowired
     private JwtUtil jwtUtil;
 
+    @Autowired
+    private BudgetService budgetService; // ✅ NEW
+
     @PostMapping
     public ResponseEntity<?> createBudget(
             @RequestBody BudgetDTO request,
@@ -43,8 +48,8 @@ public class BudgetController {
 
             User foundUser = user.get();
 
-            // Check if budget already exists for this category
-            var existing = budgetRepository.findByUserAndCategory(foundUser, request.getCategory());
+            var existing = budgetRepository.findByUserAndCategory(
+                    foundUser, request.getCategory());
             if (existing.isPresent()) {
                 return ResponseEntity.status(HttpStatus.CONFLICT)
                         .body(new ErrorResponse("Budget already exists for this category"));
@@ -86,6 +91,33 @@ public class BudgetController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new ErrorResponse("Unauthorized"));
+        }
+    }
+
+    @GetMapping("/status") // ✅ NEW ENDPOINT
+    public ResponseEntity<?> getBudgetStatus(
+            @RequestParam(required = false) String month,
+            @RequestHeader("Authorization") String token) {
+        try {
+            String email = jwtUtil.extractEmail(token.replace("Bearer ", ""));
+            var user = userRepository.findByEmail(email);
+
+            if (user.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(new ErrorResponse("User not found"));
+            }
+
+            YearMonth yearMonth = month != null
+                    ? YearMonth.parse(month)
+                    : YearMonth.now();
+
+            BudgetService.BudgetSummaryDTO status =
+                    budgetService.getBudgetStatus(user.get(), yearMonth);
+            return ResponseEntity.ok(status);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("Error fetching budget status: " + e.getMessage()));
         }
     }
 
