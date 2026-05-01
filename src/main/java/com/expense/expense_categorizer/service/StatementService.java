@@ -7,8 +7,7 @@ import com.expense.expense_categorizer.repository.TransactionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import java.math.BigDecimal;
-import java.time.LocalDate;
+
 import java.util.List;
 
 @Service
@@ -16,29 +15,24 @@ public class StatementService {
 
     @Autowired
     private TransactionRepository transactionRepository;
-
     @Autowired
     private ParserService parserService;
-
     @Autowired
     private AiCategorizationService aiCategorizationService;
 
-    public UploadResponseDTO processStatement(MultipartFile file, User user) {
+    public UploadResponseDTO processStatement(MultipartFile file, String password, User user) {
         try {
             // Step 1: Parse the file
-            List<Transaction> parsedTransactions = parserService.parseFile(file);
+            List<Transaction> parsedTransactions = parserService.parseFile(file, password);
 
             // Step 2: Categorize each transaction
             int categorizedCount = 0;
             for (Transaction txn : parsedTransactions) {
                 txn.setUser(user);
-                
                 try {
-                    // Call AI service to categorize
                     aiCategorizationService.categorizeTransaction(txn);
                     categorizedCount++;
                 } catch (Exception e) {
-                    // If categorization fails, mark as uncategorized
                     txn.setCategory("Uncategorized");
                     txn.setConfidenceScore(0.0);
                 }
@@ -53,7 +47,6 @@ public class StatementService {
                     categorizedCount,
                     "Successfully processed " + parsedTransactions.size() + " transactions"
             );
-
         } catch (Exception e) {
             throw new RuntimeException("Error processing statement: " + e.getMessage());
         }

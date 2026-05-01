@@ -2,13 +2,14 @@ package com.expense.expense_categorizer.controller;
 
 import com.expense.expense_categorizer.model.User;
 import com.expense.expense_categorizer.repository.UserRepository;
-import com.expense.expense_categorizer.security.JwtUtil;
 import com.expense.expense_categorizer.service.StatementService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.security.Principal;
 
 @RestController
 @RequestMapping("/api/statements")
@@ -17,22 +18,26 @@ public class StatementController {
 
     @Autowired
     private StatementService statementService;
-
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private JwtUtil jwtUtil;
+    // ✅ REMOVED: JwtUtil (no longer needed here)
 
     @PostMapping("/upload")
     public ResponseEntity<?> uploadStatement(
             @RequestParam("file") MultipartFile file,
-            @RequestHeader("Authorization") String token) {
-        try {
-            // Extract email from JWT token
-            String email = jwtUtil.extractEmail(token.replace("Bearer ", ""));
-            var user = userRepository.findByEmail(email);
+            @RequestParam(value = "password", required = false) String password,
+            Principal principal) { // ✅ CHANGED: from @RequestHeader token to Principal
 
+        try {
+            // ✅ CHANGED: get email directly from Spring Security context
+            if (principal == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ErrorResponse("Not authenticated"));
+            }
+
+            String email = principal.getName();
+            var user = userRepository.findByEmail(email);
             if (user.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(new ErrorResponse("User not found"));
@@ -40,21 +45,19 @@ public class StatementController {
 
             User foundUser = user.get();
 
-            // Validate file
             if (file.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(new ErrorResponse("File is empty"));
             }
 
             String fileName = file.getOriginalFilename();
-            if (fileName == null || (!fileName.endsWith(".pdf") && !fileName.endsWith(".csv") && 
+            if (fileName == null || (!fileName.endsWith(".pdf") && !fileName.endsWith(".csv") &&
                 !fileName.endsWith(".xlsx") && !fileName.endsWith(".xls"))) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(new ErrorResponse("Only PDF, CSV, and Excel files are supported"));
             }
 
-            // Process the file
-            UploadResponseDTO response = statementService.processStatement(file, foundUser);
+            UploadResponseDTO response = statementService.processStatement(file, password, foundUser);
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
 
         } catch (Exception e) {
@@ -63,7 +66,6 @@ public class StatementController {
         }
     }
 
-    // Response DTO for upload
     public static class UploadResponseDTO {
         public Long userId;
         public int transactionsProcessed;
