@@ -5,20 +5,23 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+
 import java.security.Key;
+import java.util.Base64;
 import java.util.Date;
 
 @Component
 public class JwtUtil {
 
-    @Value("${jwt.secret:your-secret-key-change-this-in-application-yml}")
+    @Value("${jwt.secret}")
     private String jwtSecret;
 
-    @Value("${jwt.expiration:86400000}") // 24 hours
+    @Value("${jwt.expiration:86400000}")
     private long jwtExpiration;
 
     private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(jwtSecret.getBytes());
+        byte[] keyBytes = Base64.getDecoder().decode(jwtSecret);
+        return Keys.hmacShaKeyFor(keyBytes);
     }
 
     public String generateToken(String email) {

@@ -1,12 +1,10 @@
 package com.expense.expense_categorizer.model;
-
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
 public class User {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -17,8 +15,8 @@ public class User {
     @Column(nullable = false)
     private String password;
 
-    @Column(name = "full_name")
-    private String fullName;
+    @Column(name = "name")
+    private String name;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -28,7 +26,6 @@ public class User {
         createdAt = LocalDateTime.now();
     }
 
-    // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -38,8 +35,12 @@ public class User {
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
 
-    public String getFullName() { return fullName; }
-    public void setFullName(String fullName) { this.fullName = fullName; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+
+    // Add these two methods
+    public String getFullName() { return name; }
+    public void setFullName(String fullName) { this.name = fullName; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
