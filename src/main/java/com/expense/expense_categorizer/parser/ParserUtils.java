@@ -86,20 +86,34 @@ public class ParserUtils {
         // UPI: UPI/DR|CR/<refno>/<MerchantName>/<bank>/<vpa>/
         if (upper.startsWith("UPI/")) {
             String[] parts = raw.split("/");
-            if (parts.length >= 4) return parts[3].trim();
-            if (parts.length >= 2) return parts[parts.length - 1].trim();
+            String merchant = "";
+
+            if (parts.length >= 4) {
+                merchant = normalizeMerchantToken(parts[3]);
+            }
+
+            // Some banks split merchant names across multiple segments.
+            if (parts.length >= 5) {
+                String next = normalizeMerchantToken(parts[4]);
+                if (isLikelyMerchantToken(next)) {
+                    merchant = merchant.isBlank() ? next : (merchant + " " + next).trim();
+                }
+            }
+
+            if (!merchant.isBlank()) return merchant;
+            if (parts.length >= 2) return normalizeMerchantToken(parts[parts.length - 1]);
         }
 
         // NEFT/IMPS/RTGS/NACH: TYPE/refno/MerchantName/...
         if (upper.matches("^(NEFT|IMPS|RTGS|NACH|ECS)/.*")) {
             String[] parts = raw.split("/");
-            if (parts.length >= 3) return parts[2].trim();
+            if (parts.length >= 3) return normalizeMerchantToken(parts[2]);
         }
 
         // POS: POS/<MerchantName>/<bank>
         if (upper.startsWith("POS/")) {
             String[] parts = raw.split("/");
-            if (parts.length >= 2) return parts[1].trim();
+            if (parts.length >= 2) return normalizeMerchantToken(parts[1]);
         }
 
         // ATM withdrawal
@@ -107,14 +121,41 @@ public class ParserUtils {
             return "ATM Withdrawal";
         }
 
-        // MMT/IRCTC etc — return first meaningful segment
-        String[] parts = raw.split("[/\\-]");
-        if (parts.length >= 2 && parts[0].length() <= 6) {
-            return parts[1].trim();
+        // Generic slash-delimited fallback: choose the first likely merchant token.
+        if (raw.contains("/")) {
+            String[] slashParts = raw.split("/");
+            for (String part : slashParts) {
+                String candidate = normalizeMerchantToken(part);
+                if (isLikelyMerchantToken(candidate)) {
+                    return candidate.length() > 80 ? candidate.substring(0, 80).trim() : candidate;
+                }
+            }
         }
 
-        // Fallback — trim to 60 chars
-        return raw.length() > 60 ? raw.substring(0, 60).trim() : raw;
+        // Final fallback: keep raw text as much as possible.
+        return raw.length() > 80 ? raw.substring(0, 80).trim() : raw;
+    }
+
+    private static String normalizeMerchantToken(String token) {
+        if (token == null) return "";
+        return token
+            .replaceAll("[_|]+", " ")
+            .replaceAll("\\s{2,}", " ")
+            .trim();
+    }
+
+    private static boolean isLikelyMerchantToken(String token) {
+        if (token == null || token.isBlank()) return false;
+
+        String upper = token.toUpperCase();
+
+        // Reject obvious technical tokens.
+        if (upper.matches("^\\d+$")) return false;
+        if (upper.contains("@")) return false;
+        if (upper.matches("^(DR|CR|REF|TRF|UPI|NEFT|IMPS|RTGS|NACH|ECS|POS)$")) return false;
+        if (upper.matches("^(UTIB|HDFC|ICIC|SBIN|YESB|KKBK|PYTM|AXIS|BARB|IDFB)$")) return false;
+
+        return true;
     }
 
     /** Returns true if the line is a header, footer, or summary line to skip */
