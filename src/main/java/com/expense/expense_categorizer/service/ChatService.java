@@ -17,17 +17,18 @@ import org.springframework.web.client.RestTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 public class ChatService {
 
-    @Value("${gemini.api.key}")
-    private String geminiApiKey;
+    @Value("${groq.api.key}")
+    private String groqApiKey;
 
-    @Value("${gemini.api.url:https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent}")
-    private String geminiApiUrl;
+    private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
     @Autowired
     private ChatMessageRepository chatMessageRepository;
@@ -36,26 +37,20 @@ public class ChatService {
     private TransactionRepository transactionRepository;
 
     private final RestTemplate restTemplate = new RestTemplate();
+    private final ObjectMapper mapper = new ObjectMapper();
 
     public ChatResponseDTO processMessage(User user, String userMessage) {
         try {
-            // Save user message
             ChatMessage userChatMessage = new ChatMessage();
             userChatMessage.setUser(user);
             userChatMessage.setRole("user");
             userChatMessage.setContent(userMessage);
             chatMessageRepository.save(userChatMessage);
 
-            // Build context from recent transactions
             String context = buildTransactionContext(user);
-
-            // Build prompt with context
             String prompt = buildChatPrompt(userMessage, context);
+            String aiResponse = callGroqAPI(prompt);
 
-            // Call Gemini API
-            String aiResponse = callGeminiAPI(prompt);
-
-            // Save AI response
             ChatMessage aiChatMessage = new ChatMessage();
             aiChatMessage.setUser(user);
             aiChatMessage.setRole("assistant");
@@ -68,7 +63,6 @@ public class ChatService {
                     aiResponse,
                     aiChatMessage.getCreatedAt()
             );
-
         } catch (Exception e) {
             throw new RuntimeException("Error processing chat message: " + e.getMessage());
         }
@@ -82,91 +76,56 @@ public class ChatService {
     }
 
     public void clearChatHistory(User user) {
-        List<ChatMessage> messages = chatMessageRepository.findByUser(user);
-        chatMessageRepository.deleteAll(messages);
+        chatMessageRepository.deleteAll(chatMessageRepository.findByUser(user));
     }
 
     private String buildTransactionContext(User user) {
-        // Get last 30 days of transactions
         LocalDate startDate = LocalDate.now().minusDays(30);
         LocalDate endDate = LocalDate.now();
-
-        List<Transaction> transactions = transactionRepository
-                .findByUserAndDateBetween(user, startDate, endDate);
+        List<Transaction> transactions = transactionRepository.findByUserAndDateBetween(user, startDate, endDate);
 
         StringBuilder context = new StringBuilder();
         context.append("User's Recent Spending (Last 30 days):\n");
-
         if (transactions.isEmpty()) {
             context.append("No transactions yet.\n");
         } else {
             for (Transaction txn : transactions) {
                 context.append("- ").append(txn.getDate())
                         .append(" | ").append(txn.getMerchant())
-                        .append(" | ₹").append(txn.getAmount())
+                        .append(" | Rs.").append(txn.getAmount())
                         .append(" | Category: ").append(txn.getCategory()).append("\n");
             }
         }
-
         return context.toString();
     }
 
     private String buildChatPrompt(String userMessage, String context) {
-        return "You are a helpful personal finance assistant named FinanceBot. You help users understand their spending patterns and provide financial advice.\n\n"
+        return "You are a helpful personal finance assistant named FinanceBot.\n\n"
                 + context + "\n"
                 + "User Question: " + userMessage + "\n\n"
                 + "Provide a helpful, conversational response. Be concise but informative.";
     }
 
-    private String callGeminiAPI(String prompt) throws Exception {
+    private String callGroqAPI(String prompt) throws Exception {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(groqApiKey);
 
-        // Build request body for Gemini API
-        String requestBody = buildGeminiRequest(prompt);
+        Map<String, Object> message = new HashMap<>();
+        message.put("role", "user");
+        message.put("content", prompt);
 
+        Map<String, Object> requestMap = new HashMap<>();
+        requestMap.put("model", "llama-3.3-70b-versatile");
+        requestMap.put("messages", List.of(message));
+        requestMap.put("temperature", 0.7);
+        requestMap.put("max_tokens", 500);
+
+        String requestBody = mapper.writeValueAsString(requestMap);
         HttpEntity<String> request = new HttpEntity<>(requestBody, headers);
+        ResponseEntity<String> response = restTemplate.postForEntity(GROQ_URL, request, String.class);
 
-        // Make API call with API key in URL
-        String urlWithKey = geminiApiUrl + "?key=" + geminiApiKey;
-        ResponseEntity<String> response = restTemplate.postForEntity(urlWithKey, request, String.class);
-
-        // Parse response
-        ObjectMapper mapper = new ObjectMapper();
         JsonNode root = mapper.readTree(response.getBody());
-        
-        String aiResponse = root.path("candidates")
-                .path(0)
-                .path("content")
-                .path("parts")
-                .path(0)
-                .path("text")
-                .asText();
-
-        return aiResponse;
-    }
-
-    private String buildGeminiRequest(String prompt) throws Exception {
-        return "{\n" +
-                "  \"contents\": [{\n" +
-                "    \"parts\": [{\n" +
-                "      \"text\": \"" + escapeJson(prompt) + "\"\n" +
-                "    }]\n" +
-                "  }],\n" +
-                "  \"generationConfig\": {\n" +
-                "    \"temperature\": 0.7,\n" +
-                "    \"maxOutputTokens\": 500,\n" +
-                "    \"topP\": 0.8\n" +
-                "  }\n" +
-                "}";
-    }
-
-    private String escapeJson(String str) {
-        return str
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t");
+        return root.path("choices").path(0).path("message").path("content").asText();
     }
 }
