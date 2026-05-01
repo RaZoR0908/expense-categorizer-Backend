@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: expense-categorizer
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: false
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+server:
+  port: ${PORT:8080}
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: 86400000
+
+groq:
+  api:
+    key: ${GROQ_API_KEY}
+
+logging:
+  level:
+    root: INFO
+    com.expense.expense_categorizer: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
