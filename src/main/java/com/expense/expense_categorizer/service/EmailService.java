@@ -16,7 +16,7 @@ public class EmailService {
         Resend resend = new Resend(resendApiKey);
 
         CreateEmailOptions params = CreateEmailOptions.builder()
-            .from("onboarding@resend.dev")
+            .from("noreply@finailytics.app")
             .to(to)
             .subject("Reset Your Finailytics Password")
             .html(
