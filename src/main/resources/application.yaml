@@ -1,18 +1,13 @@
 spring:
   application:
     name: expense-categorizer
-
   flyway:
-    baseline-on-migrate: true
-    baseline-version: 0
-    enabled: true
-
+    enabled: false
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
-
   jpa:
     hibernate:
       ddl-auto: update
@@ -20,20 +15,16 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-
 server:
   port: ${PORT:8080}
-
 jwt:
   secret: ${JWT_SECRET}
   expiration: 86400000
-
 management:
   endpoints:
     web:
       exposure:
         include: "*"
-
 logging:
   level:
     root: INFO
