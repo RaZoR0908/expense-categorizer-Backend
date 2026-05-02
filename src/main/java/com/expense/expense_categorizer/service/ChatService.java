@@ -50,19 +50,16 @@ public class ChatService {
 
     public ChatResponseDTO processMessage(User user, String userMessage) {
         try {
-            // Save user message
             ChatMessage userChatMessage = new ChatMessage();
             userChatMessage.setUser(user);
             userChatMessage.setRole("user");
             userChatMessage.setContent(userMessage);
             chatMessageRepository.save(userChatMessage);
 
-            // Build context and prompt
             String context = buildTransactionContext(user);
             String prompt = buildChatPrompt(userMessage, context);
             String aiResponse = callGroqAPI(prompt);
 
-            // Save AI response
             ChatMessage aiChatMessage = new ChatMessage();
             aiChatMessage.setUser(user);
             aiChatMessage.setRole("assistant");
@@ -96,14 +93,13 @@ public class ChatService {
     }
 
     private String buildTransactionContext(User user) {
-        // ── Transactions ──────────────────────────────────────────────────────
-        LocalDate startDate = LocalDate.now().minusDays(30);
+        LocalDate startDate = LocalDate.now().minusDays(365);
         LocalDate endDate = LocalDate.now();
         List<Transaction> transactions = transactionRepository
                 .findByUserAndDateBetween(user, startDate, endDate);
 
         StringBuilder context = new StringBuilder();
-        context.append("User's Recent Spending (Last 30 days):\n");
+        context.append("User's Recent Spending (Last 12 months):\n");
         if (transactions.isEmpty()) {
             context.append("No transactions yet.\n");
         } else {
@@ -116,7 +112,6 @@ public class ChatService {
             }
         }
 
-        // ── Budget context ────────────────────────────────────────────────────
         context.append("\nUser's Monthly Budget Limits vs Actual Spending:\n");
         try {
             BudgetService.BudgetSummaryDTO budgetStatus =
