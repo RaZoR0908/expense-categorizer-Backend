@@ -1,30 +1,38 @@
 package com.expense.expense_categorizer.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
+import com.resend.Resend;
+import com.resend.core.exception.ResendException;
+import com.resend.services.emails.model.CreateEmailOptions;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
 public class EmailService {
 
-    @Autowired
-    private JavaMailSender mailSender;
+    @Value("${RESEND_API_KEY}")
+    private String resendApiKey;
 
     public void sendPasswordResetEmail(String to, String resetLink) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom("noreply@finailytics.app");
-        message.setTo(to);
-        message.setSubject("Reset Your Finalytics Password");
-        message.setText(
-            "Hi,\n\n" +
-            "You requested to reset your password.\n\n" +
-            "Click the link below:\n" +
-            resetLink + "\n\n" +
-            "This link expires in 15 minutes.\n\n" +
-            "If you didn't request this, ignore this email.\n\n" +
-            "- Finalytics"
-        );
-        mailSender.send(message);
+        Resend resend = new Resend(resendApiKey);
+
+        CreateEmailOptions params = CreateEmailOptions.builder()
+            .from("onboarding@resend.dev")
+            .to(to)
+            .subject("Reset Your Finailytics Password")
+            .html(
+                "<h2>Reset Your Password</h2>" +
+                "<p>Click the link below to reset your password:</p>" +
+                "<a href='" + resetLink + "'>Reset Password</a>" +
+                "<p>This link expires in 15 minutes.</p>" +
+                "<p>If you didn't request this, ignore this email.</p>" +
+                "<p>- Finailytics</p>"
+            )
+            .build();
+
+        try {
+            resend.emails().send(params);
+        } catch (ResendException e) {
+            throw new RuntimeException("Failed to send email: " + e.getMessage());
+        }
     }
 }
