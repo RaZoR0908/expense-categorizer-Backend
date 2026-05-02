@@ -18,6 +18,7 @@ public class PasswordResetService {
     @Autowired private PasswordEncoder passwordEncoder;
 
     private final Map<String, String> tokenStore = new ConcurrentHashMap<>();
+    private final Map<String, Long> tokenExpiry = new ConcurrentHashMap<>();
 
     public void initiateReset(String email) {
         userRepository.findByEmail(email)
@@ -25,8 +26,9 @@ public class PasswordResetService {
 
         String token = UUID.randomUUID().toString();
         tokenStore.put(token, email);
+        tokenExpiry.put(token, System.currentTimeMillis() + 15 * 60 * 1000);
 
-        String resetLink = "http://localhost:5173/reset-password?token=" + token;
+        String resetLink = "https://finailytics.app/reset-password?token=" + token;
         emailService.sendPasswordResetEmail(email, resetLink);
     }
 
@@ -34,9 +36,17 @@ public class PasswordResetService {
         String email = tokenStore.get(token);
         if (email == null) throw new RuntimeException("Invalid or expired token");
 
+        Long expiry = tokenExpiry.get(token);
+        if (expiry == null || System.currentTimeMillis() > expiry) {
+            tokenStore.remove(token);
+            tokenExpiry.remove(token);
+            throw new RuntimeException("Token has expired. Please request a new reset link.");
+        }
+
         User user = userRepository.findByEmail(email).orElseThrow();
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
         tokenStore.remove(token);
+        tokenExpiry.remove(token);
     }
 }
