@@ -124,13 +124,6 @@ Data Transfer Objects for API request/response handling.
 
 API endpoints are available at `/api/` (specific endpoints depend on controller implementations).
 
-## Contributing
-
-1. Follow Spring Boot best practices
-2. Maintain code consistency
-3. Add tests for new features
-4. Run `./mvnw clean package` before committing
-
 ## Support
 
 For issues or questions, please refer to the HELP.md file or contact the development
